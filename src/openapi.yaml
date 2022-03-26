@@ -1,0 +1,249 @@
+openapi: 3.0.0
+info:
+  title: Seal Issuing Service
+  version: '1.0'
+  description: API to issue seals for confidential data and track their usage and revelation
+servers:
+  - url: 'http://localhost:8080/api/v1'
+paths:
+  /seals:
+    post:
+      summary: Create a new seal
+      operationId: createSeal
+      x-eov-operation-handler: handlers/seals
+      tags:
+        - Seal Management
+      requestBody:
+        description: Optional parameters for creating the seal
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SealRequest'
+      responses:
+        201:
+          description: Creation successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Seal'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /seals/{id}:
+    get:
+      summary: Get a seal by its id
+      operationId: getSeal
+      x-eov-operation-handler: handlers/seals
+      tags:
+        - Seal Management
+      parameters:
+        - name: Authorization
+          description: ownership_token
+          in: header
+          schema:
+            type: string
+            format: uuid
+          required: true
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Seal'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      summary: Update a seal by its id
+      operationId: updateSeal
+      x-eov-operation-handler: handlers/seals
+      tags:
+        - Seal Management
+      parameters:
+        - name: Authorization
+          description: ownership_token
+          in: header
+          schema:
+            type: string
+            format: uuid
+          required: true
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SealUpdate'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      summary: Deletes a seal including all tracking capabilities
+      operationId: deleteSeal
+      x-eov-operation-handler: handlers/seals
+      tags:
+        - Seal Management
+      parameters:
+        - name: Authorization
+          description: ownership_token
+          in: header
+          schema:
+            type: string
+            format: uuid
+          required: true
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        204:
+          description: Deletion successful
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+  /seals/{id}/revelations:
+    post:
+      summary: Reveal a given seal
+      operationId: revealSeal
+      x-eov-operation-handler: handlers/seals
+      tags:
+        - Seal Revelation
+      parameters:
+        - name: Authorization
+          description: revelation_token
+          in: header
+          schema:
+            type: string
+            format: uuid
+          required: true
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SealRevelation'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
+components:
+  responses:
+    ErrorResponse:
+      description: Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    SealRequest:
+      title: SealRequest
+      type: object
+      properties:
+        revelation_token_max_use:
+          type: number
+          minimum: 1
+          default: 1
+        not_before:
+          type: string
+          format: date-time
+          default: <time of seal request>
+        expires_at:
+          type: string
+          format: date-time
+          default: <one year after seal request>
+    SealUpdate:
+      title: SealUpdate
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - revoked
+          readOnly: true
+    SealRevelation:
+      title: SealRevelation
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        key:
+          type: string
+          format: uuid
+          readOnly: true
+        salt:
+          type: string
+          format: uuid
+          readOnly: true
+    Seal:
+      title: seal
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        key:
+          type: string
+          format: uuid
+          readOnly: true
+        salt:
+          type: string
+          format: uuid
+          readOnly: true
+        revelation_token:
+          type: string
+          format: uuid
+          readOnly: true
+        revelation_token_max_use:
+          type: number
+          minimum: 1
+          writeOnly: true
+        ownership_token:
+          type: string
+          format: uuid
+          readOnly: true
+        status:
+          type: string
+          enum:
+            - unrevealed
+            - revealed
+            - revoked
+            - inactive
+          readOnly: true
+        not_before:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    Error:
+      title: Error
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: string
