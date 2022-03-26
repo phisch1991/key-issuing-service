@@ -1,0 +1,78 @@
+= Seal Issuing Service (SIS)
+
+== Purpose
+
+This project allows data transfer to a semi-trusted party, where the need for data revelation is dependent on future events. Its purpose is to increase the privacy of data which are revealed "just in case".
+
+== Concept
+
+A client can request a seal from the SIS. A seal is a data set and consists of a symmetric key for encryption/decryption and some metadata to allow the usage and relevation tracking of this key.
+
+IMPORTANT: There are no personal identifiable information (PII) such as IP addresses or user identifier stored along the seal. This is a core principle of SIS and ensures a high level of privacy.
+
+A seal could look like the following
+
+[source, json]
+----
+{
+    "id": "e2d96329-76cc-42ed-a49a-82ff658b4720",
+    "key": "79463cc4-9e8d-4c49-bc8f-67d64c39e408",
+    "salt": "5e305c25-5351-4bbd-857d-cc32adc98f7d",
+    "relevation_token": "1b4a78be-be7b-4677-9169-1df69384d08b",
+    "relevation_token_max_use": 1,
+    "ownership_token": "f6f3a406-c0ee-4a1b-8f28-1f4fa5148955",
+    "not_before": 1650983147,
+    "expires_at": 1682519147
+}
+----
+
+The client can then encrypt arbitrary data with the respective secret and store the secret id along with it. The cipher text and the corresponding secret id can then be shared. Whenever the recipient of the cipher text needs to reveal the information, he/she can use a client, which then retrieves the decryption key from the SIS. The SIS audits this key access, so the original requestor of the seal can check whether the secret has been revealed by somebody else.
+
+## Security considerations
+- The provided `key` is suitable for symmetric encryption (such as AES)
+- We recommend to salt the data before encryption, so SIS provides a `salt` value along with the actual key. This reduces the risk of dictionary table attacks, especially if the plain text consists of single words.
+- To ensure that only the original requestor is able to retrieve the status of a seal (e. g. if it has been revealed to somebody else), we attach a `ownership_token` to the seal to prove the identity of the owner.
+- The SIS is never aware of the data to be encrypted/decrypted. Both plain text and cipher text stay on client side at all times.
+- The seal retrieval is only possible with a `relevation_token` bound to the seal. This allows prevention of brute force attacks to retrieve seals.
+
+== Limitations
+- The SIS approach does not guarantee total confidentiality as the data recipient can always decrypt the data without approval. SIS only asserts that it cannot be done unrecognized.
+- The SIS approach cannot guarantee loss of data, as it only manages the seals, but not the payload.
+
+== SIS implementation requirements
+
+* MUST provide an publicly available endpoint to generate seals
+* MUST provide an protected (by `ownership_token`) endpoint to check the seal status and revoke the secret
+* MUST provide an protected (by `relevation_token`) endpoint to retrieve the `secret` and `salt`
+* MUST disallow secret relevation before the `not_before` date and after the `expires_at` date
+* MUST generate `id`, `key`, `salt`, `relevation_token` and `ownership_token` in an secure and unpredictable manner
+* MUST allow time restrictions (`not_before` and `expires_at`) when creating a seal
+* MUST store the seals securely and durably.
+* MUST store an audit log with the most important seal lifecycle events (such as creation, relevation, revocation)
+* MUST NOT store PII or other metadata which allow the identification of any involved party
+* SHOULD protect all endpoints against DoS attacks.
+
+== Client implementation recommendations
+
+When encrypting data before transferring to a recipient, the client
+
+* MUST use a secure cipher for encryption
+* MUST share the `id` and `relevation_token` with the recipient
+* MUST NOT share all other seal data (`key`, `salt`, `ownership_token`) with the recipient
+* MUST NOT share any payload with the SIS server
+* SHOULD do all encryption locally in the user agent or native app without server interaction
+* SHOULD at least persist the `id` and `ownership_token` of the used seals in order to track the relevation status and revoke seals
+* SHOULD add the provided salt to the plaintext before encryption to avoid dictionary attacks
+
+== Example use cases
+
+* During the COVID-19 pandemic, you visit a restaurant which is forced to register your personal details such as name and contact data. In case there is no COVID-19 case (which is very likely) the disclosure of these data has been without any use. Furthermore, the restaurant had to make sure that your data is secure. Only in the unlikely event of a COVID-19 case, the data has to be inspected and used for further investigation.
+
+* A parcel service asks you to provide some contact details in case there are urgent questions regarding your parcel. Most of the times, the parcel goes its way without any issues and they do not need to contact you, however your contact details are stored in the parcel service's systems without use.
+
+* Your employer asks you to deposit emergency contact details of your partner. In the unlikely event of an emergency (e. g. you having an medical emergency at work or you unexpectedly staying away from work), your employer can reveal the information to contact your partner, however, if there is no emergency, the employer stores unused information "just in case".
+
+* You want to provide your contact details in case somebody accidentally bumped into your car at the supermarket car park and wants to reach you.However, you do not want to simply put your name and mobile phone number on your wind screen.
+
+* You want to give a neighbour the PIN for your electronic front door lock. It should only be used for emercency cases and you want to know, if he ever has revealed the PIN.
+
