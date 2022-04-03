@@ -32,18 +32,16 @@ paths:
   /seals/{id}:
     get:
       summary: Get a seal by its id
+      description: |
+        Returns all information about the seal including sensitive data such as key and salt.
+        CAUTION: Although this endpoints returns the key, it does not increase the revelation_token_max_use counter.
       operationId: getSeal
       x-eov-operation-handler: handlers/seals
       tags:
         - Seal Management
+      security:
+        - OwnershipTokenAuth: []
       parameters:
-        - name: Authorization
-          description: ownership_token
-          in: header
-          schema:
-            type: string
-            format: uuid
-          required: true
         - name: id
           in: path
           required: true
@@ -65,20 +63,22 @@ paths:
       x-eov-operation-handler: handlers/seals
       tags:
         - Seal Management
+      security:
+        - OwnershipTokenAuth: []
       parameters:
-        - name: Authorization
-          description: ownership_token
-          in: header
-          schema:
-            type: string
-            format: uuid
-          required: true
         - name: id
           in: path
           required: true
           schema:
             type: string
             format: uuid
+      requestBody:
+        description: Update for seal
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SealUpdate'
       responses:
         200:
           description: Ok
@@ -94,14 +94,9 @@ paths:
       x-eov-operation-handler: handlers/seals
       tags:
         - Seal Management
+      security:
+        - OwnershipTokenAuth: []
       parameters:
-        - name: Authorization
-          description: ownership_token
-          in: header
-          schema:
-            type: string
-            format: uuid
-          required: true
         - name: id
           in: path
           required: true
@@ -113,6 +108,33 @@ paths:
           description: Deletion successful
         default:
           $ref: '#/components/responses/ErrorResponse'
+  /seals/{id}/events:
+    get:
+      summary: Get all events of a seal
+      operationId: getSealEvents
+      x-eov-operation-handler: handlers/seals
+      tags:
+        - Seal Management
+      security:
+        - OwnershipTokenAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        200:
+          description: Ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SealEvent'
+        default:
+          $ref: '#/components/responses/ErrorResponse'
   /seals/{id}/revelations:
     post:
       summary: Reveal a given seal
@@ -120,14 +142,9 @@ paths:
       x-eov-operation-handler: handlers/seals
       tags:
         - Seal Revelation
+      security:
+        - RevelationTokenAuth: []
       parameters:
-        - name: Authorization
-          description: revelation_token
-          in: header
-          schema:
-            type: string
-            format: uuid
-          required: true
         - name: id
           in: path
           required: true
@@ -157,9 +174,11 @@ components:
       type: object
       properties:
         revelation_token_max_use:
+          description: |
+            Maximum count of revelation token use
+            Set to 0 if token can be used without limit
           type: number
-          minimum: 1
-          default: 1
+          default: 0
         not_before:
           type: string
           format: date-time
@@ -176,7 +195,6 @@ components:
           type: string
           enum:
             - revoked
-          readOnly: true
     SealRevelation:
       title: SealRevelation
       type: object
@@ -187,42 +205,49 @@ components:
           readOnly: true
         key:
           type: string
-          format: uuid
           readOnly: true
         salt:
           type: string
-          format: uuid
           readOnly: true
     Seal:
-      title: seal
+      title: Seal
       type: object
       properties:
         id:
           type: string
+          description: Unique identifier of the seal
           format: uuid
           readOnly: true
         key:
           type: string
-          format: uuid
+          description: Secret key, use this for symmetric encryption
           readOnly: true
         salt:
           type: string
-          format: uuid
+          description: |
+            Salt value for protecting against dictionary attacks
+            Attach this to the plaintext value before encryption
           readOnly: true
         revelation_token:
           type: string
-          format: uuid
+          description: |
+            Token to reveal the secret in case of decryption
+            Must be passed to the recipient
           readOnly: true
         revelation_token_max_use:
           type: number
-          minimum: 1
-          writeOnly: true
+          description: |
+            Maximum count of revelation token use
+            Set to 0 if token can be used without limit
         ownership_token:
           type: string
-          format: uuid
+          description: |
+            Token to manage the seal after issuing, e. g for deletion or revocation
+            Must NOT be passed to the recipient
           readOnly: true
         status:
           type: string
+          description: Status of the seal
           enum:
             - unrevealed
             - revealed
@@ -231,10 +256,26 @@ components:
           readOnly: true
         not_before:
           type: string
+          description: Seal cannot be revealed before this timestamp
           format: date-time
         expires_at:
           type: string
+          description: Seal cannot be revealed after this timestamp
           format: date-time
+    SealEvent:
+      title: SealEvent
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        eventName:
+          type: string
+          enum:
+            - create
+            - revoke
+            - reveal
+            - delete
     Error:
       title: Error
       type: object
@@ -247,3 +288,10 @@ components:
           type: array
           items:
             type: string
+  securitySchemes:
+    RevelationTokenAuth:
+      type: http
+      scheme: bearer
+    OwnershipTokenAuth:
+      type: http
+      scheme: bearer
