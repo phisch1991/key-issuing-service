@@ -3,36 +3,12 @@ import cors from 'cors'
 import * as dotenv from 'dotenv'
 import * as OpenApiValidator from 'express-openapi-validator'
 import path from 'path'
-import logger from './lib/logger'
-
+import logger from './config/logger'
+import * as db from './config/db'
 import 'reflect-metadata'
-import { DataSource } from 'typeorm'
-import { Seal } from './classes/Seal'
-import { SealEvent } from './classes/SealEvent'
-import { validateOwnershipToken, validateRevelationToken } from './lib/auth'
-
-export const AppDataSource = new DataSource({
-  type: 'postgres',
-  host: 'localhost',
-  port: 5432,
-  username: 'postgres',
-  password: 'postgres',
-  database: 'postgres',
-  entities: [Seal, SealEvent],
-  synchronize: true,
-  logging: false,
-})
-
-export const sealRepository = AppDataSource.getRepository(Seal)
-export const sealEventRepository = AppDataSource.getRepository(SealEvent)
-
-AppDataSource.initialize()
-  .then(() => {
-    logger.info('Database connection established')
-  })
-  .catch((error) => console.log(error))
 
 dotenv.config({ path: __dirname + '/.env' })
+db.init()
 
 const app = express()
 const PORT: number = 8080
@@ -45,30 +21,12 @@ app.use((req, res, next) => {
   next()
 })
 
-// express-openapi-validator unfortunately parses the parameters after running the validateSecurity handlers.
-// This is why we extract the seal id first separately.
-
-app.use('/api/v1/seals/:id', (req: any, res, next) => {
-  req.id = req.params.id
-  next()
-})
-
 app.use(
   OpenApiValidator.middleware({
     apiSpec: './src/openapi.yaml',
     validateRequests: true,
     validateResponses: true,
     operationHandlers: path.join(__dirname),
-    validateSecurity: {
-      handlers: {
-        OwnershipTokenAuth(req, scopes) {
-          return validateOwnershipToken(req)
-        },
-        RevelationTokenAuth(req, scopes) {
-          return validateRevelationToken(req)
-        },
-      },
-    },
   })
 )
 

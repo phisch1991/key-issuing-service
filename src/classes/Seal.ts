@@ -1,7 +1,6 @@
 import { v4 } from 'uuid'
 import crypto from 'crypto'
-import { Column, Entity, ManyToOne, OneToMany, PrimaryColumn } from 'typeorm'
-import { SealEvent } from './SealEvent'
+import { Column, Entity, PrimaryColumn } from 'typeorm'
 
 export enum Status {
   UNREVEALED = 'unrevealed',
@@ -10,6 +9,11 @@ export enum Status {
   INACTIVE = 'inactive',
 }
 
+interface SealConfig {
+  not_before?: string,
+  expires_at?: string
+  revelation_token_max_use?: number
+}
 @Entity()
 export class Seal {
   @PrimaryColumn()
@@ -40,18 +44,16 @@ export class Seal {
   status: Status
 
   constructor(
-    revelationTokenMaxUse: number,
-    notBefore: string,
-    expiresAt: string
+    config: SealConfig
   ) {
     this.id = v4()
     this.key = crypto.pseudoRandomBytes(32).toString('hex')
     this.salt = crypto.pseudoRandomBytes(32).toString('hex')
-    ;(this.revelation_token = crypto.pseudoRandomBytes(32).toString('hex')),
-      (this.revelation_token_max_use = revelationTokenMaxUse)
-    ;(this.ownership_token = crypto.pseudoRandomBytes(32).toString('hex')),
-      (this.not_before = notBefore)
-    this.expires_at = expiresAt
+    this.revelation_token = crypto.pseudoRandomBytes(32).toString('hex')
+    this.revelation_token_max_use = config?.revelation_token_max_use || 0
+    this.ownership_token = crypto.pseudoRandomBytes(32).toString('hex')
+    this.not_before = config?.not_before || new Date().toISOString()
+    this.expires_at = config?.expires_at || new Date().toISOString()
     this.status = Status.UNREVEALED
   }
 }

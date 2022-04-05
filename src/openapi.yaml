@@ -178,15 +178,12 @@ components:
             Maximum count of revelation token use
             Set to 0 if token can be used without limit
           type: number
-          default: 0
         not_before:
           type: string
           format: date-time
-          default: <time of seal request>
         expires_at:
           type: string
           format: date-time
-          default: <one year after seal request>
     SealUpdate:
       title: SealUpdate
       type: object

@@ -3,11 +3,8 @@ import {
   Column,
   Entity,
   Index,
-  JoinColumn,
-  ManyToOne,
   PrimaryColumn,
 } from 'typeorm'
-import { Seal } from './Seal'
 
 export enum SealEventName {
   CREATE = 'create',
